@@ -8,19 +8,6 @@ use std::process;
 
 const WORDS_FILE: &str = "data/words5.txt";
 
-// Source for words
-struct WordSource<'a> {
-    file: &'a str,   // file from which words are read
-    content: String, // content of the file
-}
-
-impl WordSource<'_> {
-    fn load(file: &str) -> Result<WordSource, Box<dyn Error>> {
-        let content = fs::read_to_string(file)?;
-        Ok(WordSource { file, content })
-    }
-}
-
 // state of current
 struct State<'a> {
     chosen: Option<&'a String>, // wordto guess for (uppercase)
@@ -51,9 +38,8 @@ enum Match {
     NONE, // letter don't exists
 }
 
-fn read_words<'a>(source: &'a WordSource) -> Vec<String> {
-    source
-        .content
+fn load_words(content: String) -> Vec<String> {
+    content
         .split("\n")
         .filter(|w| w.len() == 5 && w.chars().all(char::is_alphabetic))
         .map(|w| w.to_uppercase())
@@ -136,12 +122,19 @@ fn playagain() -> Result<bool, Box<dyn Error>> {
 }
 
 fn main() {
-    let source = WordSource::load(WORDS_FILE).unwrap_or_else(|err| {
-        eprintln!("Error occured while reading file: {} \n{}", WORDS_FILE, err);
-        process::exit(1);
-    });
+    let words = match fs::read_to_string(WORDS_FILE) {
+        Ok(content) => load_words(content),
+        Err(e) => {
+            eprintln!("Error occured while reading file: {} \n{}", WORDS_FILE, e);
+            process::exit(1);
+        }
+    };
 
-    let words: Vec<String> = read_words(&source);
+    if words.len() == 0 {
+        eprintln!("No appropriate words found in file: {}", WORDS_FILE);
+        process::exit(1);
+    }
+
     let mut state = State::init(6);
 
     println!("\n\x1b[30;41m W \x1b[30;42m O \x1b[30;43m R \x1b[30;44m D \x1b[30;45m L \x1b[30;46m E \x1b[0m \n");
@@ -171,9 +164,13 @@ fn main() {
             println!("You WON!");
         } else if state.attempts >= state.max_attempts {
             println!("You LOST!");
-            if let Some(word) = state.chosen {
-                println!("Word: {}", word.to_uppercase());
-            }
+            match state.chosen {
+                Some(word) => println!("Word: {}", word),
+                None => {
+                    eprintln!("Something went wrong: No word is chosen!");
+                    process::exit(1);
+                }
+            };
         } else {
             continue;
         }
