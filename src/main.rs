@@ -23,9 +23,9 @@ impl WordSource<'_> {
 
 // state of current
 struct State<'a> {
-    chosen: Option<&'a str>, // wordto guess for (uppercase)
-    attempts: u64,           // attempts made by user
-    max_attempts: u64,       // maximum attempts allowed
+    chosen: Option<&'a String>, // wordto guess for (uppercase)
+    attempts: u64,              // attempts made by user
+    max_attempts: u64,          // maximum attempts allowed
 }
 
 impl<'a> State<'a> {
@@ -51,9 +51,13 @@ enum Match {
     NONE, // letter don't exists
 }
 
-fn read_words<'a>(source: &'a WordSource) -> Vec<&'a str> {
-    let words: Vec<&str> = source.content.split("\n").collect();
-    words
+fn read_words<'a>(source: &'a WordSource) -> Vec<String> {
+    source
+        .content
+        .split("\n")
+        .filter(|w| w.len() == 5 && w.chars().all(char::is_alphabetic))
+        .map(|w| w.to_uppercase())
+        .collect()
 }
 
 fn input_guess(attempt_no: u64) -> Result<String, Box<dyn Error>> {
@@ -76,15 +80,14 @@ fn input_guess(attempt_no: u64) -> Result<String, Box<dyn Error>> {
     }
 }
 
-fn random_word<'a>(words: &'a Vec<&str>) -> Option<&'a str> {
-    words.choose(&mut thread_rng()).copied()
+fn random_word<'a>(words: &'a Vec<String>) -> Option<&'a String> {
+    words.choose(&mut thread_rng())
 }
 
 fn evaluate_guess(state: &mut State, guess: &String) -> Option<([Match; 5], u8)> {
     let chosen = state.chosen.as_ref()?;
     let mut matches = [Match::NONE; 5];
     let mut full_match_count: u8 = 0;
-    let chosen = chosen.to_uppercase();
 
     for (i, (guess_ch, chosen_ch)) in guess.chars().zip(chosen.chars()).enumerate() {
         if guess_ch == chosen_ch {
@@ -138,7 +141,7 @@ fn main() {
         process::exit(1);
     });
 
-    let words: Vec<&str> = read_words(&source);
+    let words: Vec<String> = read_words(&source);
     let mut state = State::init(6);
 
     println!("\n\x1b[30;41m W \x1b[30;42m O \x1b[30;43m R \x1b[30;44m D \x1b[30;45m L \x1b[30;46m E \x1b[0m \n");
