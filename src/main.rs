@@ -21,33 +21,19 @@ impl WordSource<'_> {
     }
 }
 
-// Attempts limit
-enum Limit {
-    FIXED(u64), // fixed limit; max no of attempts
-    INFINITE,   // unlimited no of attempts
-}
-
 // state of current
 struct State<'a> {
     chosen: Option<&'a str>, // wordto guess for (uppercase)
     attempts: u64,           // attempts made by user
-    limit: Limit,            // limit on attempts
+    max_attempts: u64,       // maximum attempts allowed
 }
 
 impl<'a> State<'a> {
-    fn fixed_attempts(attempts: u64) -> State<'static> {
+    fn init(max_attempts: u64) -> State<'static> {
         State {
             chosen: None,
             attempts: 0 as u64,
-            limit: Limit::FIXED(attempts),
-        }
-    }
-
-    fn infinite_attempts() -> State<'static> {
-        State {
-            chosen: None,
-            attempts: 0 as u64,
-            limit: Limit::INFINITE,
+            max_attempts,
         }
     }
 
@@ -111,9 +97,7 @@ fn evaluate_guess(state: &mut State, guess: &String) -> Option<([Match; 5], u8)>
         }
     }
 
-    if let Limit::FIXED(_) = state.limit {
-        state.attempts += 1;
-    }
+    state.attempts += 1;
 
     Some((matches, full_match_count))
 }
@@ -155,7 +139,7 @@ fn main() {
     });
 
     let words: Vec<&str> = read_words(&source);
-    let mut state = State::fixed_attempts(6);
+    let mut state = State::init(6);
 
     println!("\n\x1b[30;41m W \x1b[30;42m O \x1b[30;43m R \x1b[30;44m D \x1b[30;45m L \x1b[30;46m E \x1b[0m \n");
 
@@ -180,16 +164,9 @@ fn main() {
 
         println!("{}\n", format_match(&guess, matches));
 
-        let mut game_over = false;
-        if let Limit::FIXED(limit) = state.limit {
-            if state.attempts >= limit {
-                game_over = true;
-            }
-        }
-
         if match_count == 5 {
             println!("You WON!");
-        } else if game_over {
+        } else if state.attempts >= state.max_attempts {
             println!("You LOST!");
             if let Some(word) = state.chosen {
                 println!("Word: {}", word.to_uppercase());
