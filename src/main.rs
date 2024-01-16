@@ -7,28 +7,6 @@ use std::io;
 use std::io::Write;
 use std::process;
 
-// state of current
-struct State<'a> {
-    chosen: Option<&'a String>,
-    attempts: u64,
-    max_attempts: u64,
-}
-
-impl<'a> State<'a> {
-    fn init(max_attempts: u64) -> State<'static> {
-        State {
-            chosen: None,
-            attempts: 0 as u64,
-            max_attempts,
-        }
-    }
-
-    fn reset(&mut self) {
-        self.chosen = None;
-        self.attempts = 0 as u64;
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
 enum Match {
     FULL, // letter exists and in correct index
@@ -44,7 +22,7 @@ fn load_words(content: String) -> Vec<String> {
         .collect()
 }
 
-fn input_guess(attempt_no: u64) -> Result<String, Box<dyn Error>> {
+fn input_guess(attempt_no: u8) -> Result<String, Box<dyn Error>> {
     loop {
         let mut input = String::new();
 
@@ -68,8 +46,8 @@ fn random_word<'a>(words: &'a Vec<String>) -> Option<&'a String> {
     words.choose(&mut thread_rng())
 }
 
-fn evaluate_guess(state: &mut State, guess: &String) -> Option<([Match; 5], u8)> {
-    let chosen = state.chosen.as_ref()?;
+fn evaluate_guess(guess: &String, chosen_word: Option<&String>) -> Option<([Match; 5], u8)> {
+    let chosen = chosen_word.as_ref()?;
     let mut matches = [Match::NONE; 5];
     let mut full_match_count: u8 = 0;
 
@@ -83,8 +61,6 @@ fn evaluate_guess(state: &mut State, guess: &String) -> Option<([Match; 5], u8)>
             matches[i] = Match::NONE;
         }
     }
-
-    state.attempts += 1;
 
     Some((matches, full_match_count))
 }
@@ -122,7 +98,7 @@ fn playagain() -> Result<bool, Box<dyn Error>> {
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 2 {
-        eprintln!("Usage: program [file]");
+        eprintln!("Usage: program [wordsfile]");
         process::exit(1);
     }
 
@@ -146,22 +122,26 @@ fn main() {
     }
 
     let wordle = "\x1b[30;41m W \x1b[30;42m O \x1b[30;43m R \x1b[30;44m D \x1b[30;45m L \x1b[30;46m E \x1b[0m";
-    let max_attempts = 6;
-    let mut state = State::init(max_attempts);
+
+    let max_attempts: u8 = 6;
+    let mut attempts: u8 = 0;
+    let mut chosen_word: Option<&String> = None;
 
     loop {
-        if let None = state.chosen {
-            state.chosen = random_word(&words);
-            state.attempts = 0;
+        if let None = chosen_word {
+            chosen_word = random_word(&words);
+            attempts = 0;
             println!("\n{}\n", wordle);
         }
 
-        let guess = input_guess(state.attempts + 1).unwrap_or_else(|err| {
+        attempts += 1;
+
+        let guess = input_guess(attempts).unwrap_or_else(|err| {
             eprintln!("Error while tking input: {}", err);
             process::exit(1);
         });
 
-        let (matches, match_count) = match evaluate_guess(&mut state, &guess) {
+        let (matches, match_count) = match evaluate_guess(&guess, chosen_word) {
             Some(res) => res,
             None => {
                 eprintln!("Something went wrong, guessed word is None!");
@@ -173,9 +153,9 @@ fn main() {
 
         if match_count == 5 {
             println!("You WON!");
-        } else if state.attempts >= state.max_attempts {
+        } else if attempts >= max_attempts {
             println!("You LOST!");
-            match state.chosen {
+            match chosen_word {
                 Some(word) => println!("Word: {}", word),
                 None => {
                     eprintln!("Something went wrong: No word is chosen!");
@@ -192,7 +172,7 @@ fn main() {
         });
 
         if keep_playing {
-            state.reset();
+            chosen_word = None;
         } else {
             break;
         }
